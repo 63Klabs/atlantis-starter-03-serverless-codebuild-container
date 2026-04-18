@@ -6,10 +6,10 @@
 ├── application-infrastructure/    # AWS SAM application stack
 │   ├── build-scripts/             # Python scripts used during CodeBuild
 │   │   ├── generate-put-ssm.py
-│   │   ├── update_template_configuration.py
-│   │   └── update_template_timestamp.py
+│   │   └── update_template_configuration.py
 │   ├── src/                       # Lambda function source code (Python)
-│   │   ├── index.py               # Lambda handler entry point
+│   │   ├── scripts/               # Scripts for CodeBuild Container
+│.  │   └── buildspec.yml          # CodeBuild Container
 │   ├── buildspec.yml              # AWS CodeBuild build specification
 │   ├── template.yml               # AWS SAM/CloudFormation template
 │   └── template-configuration.json # Stack parameter overrides
@@ -30,19 +30,14 @@
 
 ```mermaid
 flowchart TB
-    Client([Client]) -->|HTTPS Request| APIGW
+    EventSchedule([Schedule]) -->|Event| CODEBUILD
 
-    subgraph AWS["AWS Cloud"]
-        APIGW["API Gateway<br/>(REST API)"]
-        APIGW -->|Invoke| Lambda["Lambda Function<br/>(Python)"]
-        Lambda -->|Write Logs| CWLogs["CloudWatch<br/>Log Group"]
-        Lambda -.->|Monitored by| CWAlarm["CloudWatch<br/>Alarm (PROD)"]
+        CODEBUILD["CodeBuild<br/>(Container)"]
+        CODEBUILD -->|Execution Logs| CODEBUILDLogs["CloudWatch<br/>CodeBuild Logs"]
+        CODEBUILDLogs --> CWAlarm
         CWAlarm -.->|Notify| SNS["SNS Topic"]
         SNS -.->|Email| Email([Admin Email])
-        APIGW -->|Access/Execution Logs| APILogs["CloudWatch<br/>API Gateway Logs"]
-    end
 
-    APIGW -->|JSON Response| Client
 ```
 
 ## Deployment Pipeline
@@ -53,12 +48,10 @@ flowchart LR
     CodeBuild -->|"npm install<br/>SAM package"| Artifacts["S3 Artifacts<br/>Bucket"]
     Artifacts --> CFN["CloudFormation<br/>Deploy"]
     CFN -->|"Create/Update Stack"| Stack["Application<br/>Stack"]
-    CFN -->|"PROD: Gradual<br/>DEV/TEST: AllAtOnce"| CodeDeploy["CodeDeploy<br/>Traffic Shifting"]
 ```
 
 ## Key Design Decisions
 
-- **Gradual deployments** are enabled only in PROD (via CodeDeploy traffic shifting); DEV/TEST deploy all-at-once.
 - **CloudWatch Alarms** and SNS notifications are created only in PROD to reduce cost.
-- **API Gateway logging** (access + execution) is opt-in and requires an account-level service role to be configured first.
+- **CodeBuild logging** (execution)
 - **Permissions Boundary** support is optional, controlled via a stack parameter.

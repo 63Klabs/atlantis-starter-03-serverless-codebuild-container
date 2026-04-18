@@ -18,11 +18,11 @@ It is the responsibility of the developer/maintainer of any repository that was 
 
 ## Reporting a Vulnerability
 
-This repository was created using [Atlantis Starter #01](https://github.com/63Klabs/atlantis-starter-01-basic-apigw-lambda-py) as a template.
+This repository was created using [Atlantis Starter #03](https://github.com/63Klabs/atlantis-starter-03-serverless-codebuild-container) as a template.
 
 ### Starter Code
 
-If a developer using the Starter finds a **vulnerability in the code or configuration provided by the starter**, they are encouraged to report it using the [Security and quality](https://github.com/63Klabs/atlantis-starter-01-basic-apigw-lambda-py/security) section of the original GitHub repository.
+If a developer using the Starter finds a **vulnerability in the code or configuration provided by the starter**, they are encouraged to report it using the [Security and quality](https://github.com/63Klabs/atlantis-starter-03-serverless-codebuild-container/security) section of the original GitHub repository.
 
 ### Custom Code
 
