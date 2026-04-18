@@ -1,21 +1,33 @@
-# Basic API Gateway with Lambda Function Written in Python
+# Serverless CodeBuild Container
 
-A very simple example to demonstrate Atlantis Template for AWS CodePipeline to provision a web service that utilizes API Gateway and a simple Lambda function written in Python.
+An example to demonstrate Atlantis provisioning a container service utilizing a CodeBuild Project triggered by an Event Schedule to run jobs.
 
 | | Build/Deploy | Application Stack |
 |---|---|---|
-| **Languages** | Python, Shell | Python |
+| **Languages** | Python, Shell | Shell, Python, Node.js |
 | **Frameworks** | Atlantis | Atlantis |
-| **Features** | SSM Parameters | API Gateway, Lambda, CloudWatch Logs, CloudWatch Alarms |
+| **Features** | SSM Parameters | CodeBuild Project, Event Scheduler, CloudWatch Logs, CloudWatch Alarms |
 
 > **Ready-to-Deploy-and-Run** with the [63Klabs Atlantis Templates and Scripts Platform for Serverless Deployments on AWS](https://github.com/63Klabs/atlantis)
 
+## Why Use Over a Self-Managed Container?
+
+First, you may not need a container when the AWS managed Linux environment provided by CodeBuild will do.
+
+If you just need to run scripts on a periodic basis, and you don't need persistence between runs, CodeBuild provides a lightweight option on an environment managed by AWS. However, you should use your own self-managed container when you need to install applications or require installs, data, and advanced configurations to persist between runs.
+
+With the ability to mount S3 as an NFS you can extend persistence within CodeBuild.
+
+## Why Use Over Lambda?
+
+Scheduled Lambda functions serve their purpose, but if you are running a combination of shell, Python, and/or Node.js scripts, or you just need to run scripts "off the shelf" without modifying to run inside Lambda, CodeBuild is a good option.
+
+What about Lambda containers? We'll return to the fact that you may not need a container when the AWS managed Linux environment provided by CodeBuild will do.
+
 ## Tutorial
 
-> Note: To keep this example VERY basic and simple, concepts such as routing, caching, and advanced monitoring are not used. For near production-ready examples, review the the other Atlantis starter applications.
-
 1. Read the [Atlantis Tutorials introductory page](https://github.com/63Klabs/atlantis-tutorials)
-2. Then perform the steps outlined in the [Basic API Gateway with Lambda Python tutorial](https://github.com/63Klabs/atlantis-tutorials/tree/main/tutorials/01-basic-api-gateway-with-lambda-written-in-python).
+2. Then perform the steps outlined in the [Run CodeBuild on a Schedule for Operations tutorial](https://github.com/63Klabs/atlantis-tutorials/blob/main/tutorials/05-run-codebuild-on-a-schedule-for-operations/).
 
 ## Architecture
 

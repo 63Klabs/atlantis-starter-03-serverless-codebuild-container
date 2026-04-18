@@ -4,19 +4,19 @@
 
 ```
 ├── application-infrastructure/    # AWS SAM application stack
-│   ├── build-scripts/             # Python scripts used during CodeBuild
+│   ├── build-scripts/             # Scripts used during CodeBuild (Pipeline)
 │   │   ├── generate-put-ssm.py
 │   │   └── update_template_configuration.py
-│   ├── src/                       # Lambda function source code (Python)
+│   ├── src/                       # Commands and Scripts for Scheduled Container
 │   │   ├── scripts/               # Scripts for CodeBuild Container
-│.  │   └── buildspec.yml          # CodeBuild Container
+│.  │   └── commands.yml           # Commands for CodeBuild Container
 │   ├── buildspec.yml              # AWS CodeBuild build specification
 │   ├── template.yml               # AWS SAM/CloudFormation template
 │   └── template-configuration.json # Stack parameter overrides
 ├── docs/                          # Documentation
 │   ├── admin-ops/                 # For Admin, Operations
 │   ├── developer/                 # For Developer maintaining application
-│   └── end-user/                  # For consumer of this application's output (API, Site, Exported reports)
+│   └── end-user/                  # For consumer of this application's output (Exported reports)
 ├── scripts/                       # Utility scripts ran by developer (Not part of deployment)
 │   └── generate-sidecar-metadata.py
 ├── AGENTS.md                      # AI and developer guidelines

@@ -55,7 +55,6 @@ Always make and commit your changes in `dev`
 Perform merges to advance code to the next branch. `dev` -> `test` -> `beta` -> `main`
 
 ```bash
-git switch dev
 git switch test
 git merge dev
 git push

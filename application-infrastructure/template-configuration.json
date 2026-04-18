@@ -1,10 +1,10 @@
 {
   "Parameters": {
-    "ApiPathBase": "$PROJECT_ID$-$STAGE_ID$",
-    "ApiGatewayLoggingEnabled": "FALSE"
+    "S3_MOUNT_POINT": "",
+    "S3_BUCKET_NAME": ""
   },
   "Tags": {
-    "Name": "Hello World Web Service API $PREFIX$-$PROJECT_ID$",
+    "Name": "CodeBuild Container $PREFIX$-$PROJECT_ID$",
     "CostCenter": "1234-X",
     "Creator": "nowhere@example",
     "Owner": "nowhere@example",

@@ -3,21 +3,21 @@
 # and limitations under the License.
 #
 # Atlantis for AWS SAM Deployments
-# Starter 01 - Basic API Gateway and Lambda using Python
+# Starter 03 - Serverless CodeBuild Container
 # Author: Chad Kluck - 63klabs.net
-# Version: v2.0.3/2025-11-25
+# Version: v0.0.1/2026-04-18
 
 # Documentation, Issues/Feature Requests, Latest Updates, and Security Reports on GitHub:
-# https://github.com/63Klabs/atlantis-starter-00-basic-apigw-lambda-nodejs
+# https://github.com/63Klabs/atlantis-starter-03-serverless-codebuild-container
 
-# Creates a basic web service using API Gateway and Lambda using Python
+# Creates a Scheduled CodeBuild Project to run shell, Python, Node.js or other commands
 
 # USE WITH:
-# - atlantis/v2/pipeline/template.yml
+# - atlantis/v2/pipeline/template-pipeline.yml
 
 AWSTemplateFormatVersion: "2010-09-09"
 Transform:  AWS::Serverless-2016-10-31
-Description: "A basic web service using API Gateway and Lambda Python - atlantis-starter-01-basic-apigw-lambda-py"
+Description: "Scheduled CodeBuild Project to run shell, Python, Node.js or other commands - atlantis-starter-03-serverless-codebuild-container"
 
 # =============================================================================
 # META DATA
