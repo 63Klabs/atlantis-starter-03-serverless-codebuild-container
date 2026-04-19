@@ -1,7 +1,6 @@
 {
   "Parameters": {
-    "S3_MOUNT_POINT": "",
-    "S3_BUCKET_NAME": ""
+    "S3StaticHostBucket": "$S3_STATIC_HOST_BUCKET$"
   },
   "Tags": {
     "Name": "CodeBuild Container $PREFIX$-$PROJECT_ID$",

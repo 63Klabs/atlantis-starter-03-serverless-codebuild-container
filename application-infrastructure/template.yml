@@ -26,6 +26,12 @@ Description: "Scheduled CodeBuild Project to run shell, Python, Node.js or other
 # 
 
 Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - W2001 # DeployRole is unused but required by pipeline template ParameterOverrides
+        - E2001 # Metadata on DeployRole parameter is valid CloudFormation but not recognized by cfn-lint v1.x
+        - E8005 # Fn::If inside Fn::Equals in conditions is valid CloudFormation but flagged by cfn-lint
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - 
@@ -40,10 +46,9 @@ Metadata:
           - PermissionsBoundaryArn
       -
         Label:
-          default: "Deployment Environment Information"
+          default: "Deployment Environment"
         Parameters:
           - DeployEnvironment
-          - FunctionGradualDeploymentType
           - DeployRole
       -
         Label:
@@ -51,20 +56,27 @@ Metadata:
         Parameters:
           - ParameterStoreHierarchy
           - AlarmNotificationEmail
-      -
-        Label:
-          default: "Lambda Function Settings"
-        Parameters:
-          - FunctionTimeOutInSeconds
-          - FunctionMaxMemoryInMB
-      -
-        Label:
-          default: "Application Parameters"
-        Parameters:
-          - ApiPathBase
           - LogRetentionInDaysForPROD
           - LogRetentionInDaysForDEVTEST
-          - ApiGatewayLoggingEnabled
+      -
+        Label:
+          default: "CodeBuild Settings"
+        Parameters:
+          - CodeBuildTimeoutInMinutes
+          - S3StaticHostBucket
+      -
+        Label:
+          default: "Schedule Settings"
+        Parameters:
+          - ScheduleExpressionPROD
+          - ScheduleExpressionDEVTEST
+      -
+        Label:
+          default: "S3 and PrivilegedMode Settings"
+        Parameters:
+          - S3MountPoint
+          - S3MountBucketName
+          - PrivilegedMode
 
 # =============================================================================
 # PARAMETERS
@@ -140,24 +152,14 @@ Parameters:
     AllowedValues: ["DEV", "TEST", "PROD"]
     ConstraintDescription: "Must specify DEV, TEST, or PROD."
 
-  FunctionGradualDeploymentType:
-    Type: String
-    Description: "For production environments, what method do you want to use to gradually deploy before rolling back in case of errors. Note that when 'DeployEnvironment' is TEST or DEV, gradual deploy will not be enabled and will be same as All At Once"
-    Default: "Linear10PercentEvery3Minutes"
-    AllowedValues:
-      - "Canary10Percent5Minutes" # Canary = First 10%, then after x minutes, full 90% (full deploy after x minutes)
-      - "Canary10Percent10Minutes"
-      - "Canary10Percent15Minutes"
-      - "Canary10Percent30Minutes"
-      - "Linear10PercentEvery1Minute" # Linear = Total of 10 deploys every x minutes: 10%, wait x minutes, another 10%, wait, 10%.... (full deploy after 10 * x minutes)
-      - "Linear10PercentEvery2Minutes"
-      - "Linear10PercentEvery3Minutes"
-      - "Linear10PercentEvery10Minutes"
-      - "AllAtOnce" # All at once. Recommended only for TEST and DEV environments.
-
   DeployRole:
     Type: String
-    Description: "IAM role to allow AWS CodeDeploy to manage deployment of AWS Lambda functions"
+    Description: "Unused. Required by pipeline template ParameterOverrides."
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W2001
 
   # ---------------------------------------------------------------------------
   # External Resources and Alarm Notifications
@@ -169,40 +171,7 @@ Parameters:
     ConstraintDescription: "A valid email address"
 
   # ---------------------------------------------------------------------------
-  # Lambda Function Settings
-
-  FunctionTimeOutInSeconds:
-    Type: Number
-    Description: "Time out in seconds for the Lambda function. API Gateway times out after 30 seconds. This web service is ideal for requests that can complete in less than 10 seconds"
-    Default: 10
-    MinValue: 3
-    MaxValue: 30
-
-  FunctionMaxMemoryInMB:
-    Type: Number
-    Description: "If you are handling large responses, you will need to increase the size. Monitor CloudWatch logs. 1024 MB is a good starting point for most API web service applications."
-    Default: 1024 # 1 GB
-    MinValue: 128
-    MaxValue: 10240 # 10 GB
-    ConstraintDescription: "Must be between 128 and 1024 MB (10 GB). 1024 MB is a good starting point for most API web service applications."
-
-  FunctionArchitecture:
-    Type: String
-    Description: "The instruction set architecture for the Lambda function. Lambda functions support x86_64 and arm64 architectures. arm64 has better processing than default x86_64 - but the layers and binaries you use must support it."
-    Default: "arm64"
-    AllowedValues: ["x86_64", "arm64"]
-
-  # ---------------------------------------------------------------------------
-  # Application Parameters
-
-  ApiPathBase:
-    Type: String
-    Description: "The path API Gateway uses as the first segment in the invoked Uniform Resource Identifier (URI). Since API Gateway generates random characters for the domain, it can be helpful to use this in identifying applications and stages. If a custom domain is used it can be masked and hidden from visitors. For example: xyz08ryz.apigateway.aws.com/pets or xyz08ryz.apigateway.aws.com/myapp or xyz08ryz.apigateway.aws.com/myapp-test. It is recommended you set this in the template-config.json file and allow the stage to be dynamically appended."
-    Default: "api"
-    AllowedPattern: ^[a-z0-9]([a-z0-9-_]*[a-z0-9])?$
-    MaxLength: 128
-    MinLength: 1
-    ConstraintDescription: "1-128 lowercase alpha numeric, hyphens, and underscores. Must begin and end with an alphanumeric character."
+  # Log Retention Settings
 
   LogRetentionInDaysForPROD:
     Type: Number
@@ -216,11 +185,45 @@ Parameters:
     Default: 7
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
 
-  ApiGatewayLoggingEnabled:
+  # ---------------------------------------------------------------------------
+  # CodeBuild Settings
+
+  ScheduleExpressionPROD:
     Type: String
-    Description: "An administrator must enable API Gateway logging account-wide prior to setting this to TRUE. See https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html"
-    Default: "FALSE"
-    AllowedValues: ["TRUE", "FALSE"]
+    Description: "Schedule expression for PROD environment (cron or rate). Leave empty to disable scheduling."
+    Default: "cron(0 6 * * ? *)"
+
+  ScheduleExpressionDEVTEST:
+    Type: String
+    Description: "Schedule expression for DEV/TEST environments (cron or rate). Leave empty to disable scheduling."
+    Default: ""
+
+  CodeBuildTimeoutInMinutes:
+    Type: Number
+    Description: "Maximum time in minutes the CodeBuild project can run before timing out."
+    Default: 10
+    MinValue: 5
+    MaxValue: 480
+
+  S3StaticHostBucket:
+    Type: String
+    Description: "S3 bucket storing commands.yml and scripts for the Scheduled CodeBuild."
+
+  S3MountPoint:
+    Type: String
+    Description: "Optional S3 mount path for mounting an S3 bucket as a file system in the Scheduled CodeBuild."
+    Default: ""
+
+  S3MountBucketName:
+    Type: String
+    Description: "Optional S3 bucket name to mount as a file system in the Scheduled CodeBuild."
+    Default: ""
+
+  PrivilegedMode:
+    Type: String
+    Description: "Enable elevated permissions (e.g. sudo) in the Scheduled CodeBuild. Auto-enabled when S3 mount parameters are provided."
+    Default: "false"
+    AllowedValues: ["true", "false"]
 
 # =============================================================================
 # CONDITIONS
@@ -239,19 +242,16 @@ Conditions:
   # CreateDevResources: !Equals [!Ref DeployEnvironment, "DEV"]
   # UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   HasPermissionsBoundaryArn: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
-  CreateAlarms: !Equals [!Ref DeployEnvironment, "PROD"] 
-  # IsArmArch: !Equals [!Ref FunctionArchitecture, "arm64"]
-  ApiGatewayLoggingIsEnabled: !Equals [!Ref ApiGatewayLoggingEnabled, "TRUE"]
-
-# =============================================================================
-# GLOBALS
-# -----------------------------------------------------------------------------
-# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
-#
-
-Globals:
-  Api:
-    OpenApiVersion: 3.0.0 # Prevents extra stage called Stage in API Gateway https://www.internetkatta.com/how-to-prevent-aws-sam-from-creating-the-default-stage-in-api-gateway-stage
+  CreateAlarms: !Equals [!Ref DeployEnvironment, "PROD"]
+  HasScheduleExpression: !Not
+    - !Equals
+      - !If [IsProduction, !Ref ScheduleExpressionPROD, !Ref ScheduleExpressionDEVTEST]
+      - ""
+  EnablePrivilegedMode: !Or
+    - !Equals [!Ref PrivilegedMode, "true"]
+    - !And
+      - !Not [!Equals [!Ref S3MountPoint, ""]]
+      - !Not [!Equals [!Ref S3MountBucketName, ""]]
 
 # =============================================================================
 # RESOURCES
@@ -261,204 +261,172 @@ Globals:
 
 Resources:
 
-  # ---------------------------------------------------------------------------
-  # API Gateway Resources
+  # -- CodeBuild Execution Role --
 
-  # -- API Gateway --
-  WebApi:
-    Type: AWS::Serverless::Api
-    Properties: 
-      Name: !Sub '${Prefix}-${ProjectId}-${StageId}-WebApi'
-      StageName: !Ref ApiPathBase
-
-      # -- The following adds two levels of logging to API Gateway --
-      # -- However, an account admin will need to add a service role to allow API Gateway to write to CloudWatch logs --
-      # -- See https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html --
-
-      # Add API Gateway logging configuration
-      AccessLogSetting: !If
-        - ApiGatewayLoggingIsEnabled
-        - DestinationArn: !GetAtt ApiGatewayAccessLogGroup.Arn
-          Format: '{"requestId":"$context.requestId", "extendedRequestId":"$context.extendedRequestId", "ip":"$context.identity.sourceIp", "caller":"$context.identity.caller", "user":"$context.identity.user", "requestTime":"$context.requestTime", "httpMethod":"$context.httpMethod", "path":"$context.path", "resourcePath":"$context.resourcePath", "routeKey":"$context.routeKey", "status":"$context.status", "protocol":"$context.protocol", "responseLength":"$context.responseLength", "integrationError":"$context.integrationErrorMessage", "authorizerError":"$context.authorizer.error", "authorizerStatus":"$context.authorizer.status", "authorizerLatency":"$context.authorizer.latency"}'
-        - !Ref 'AWS::NoValue'
-      
-      # Add execution logging to CloudWatch
-      MethodSettings: !If
-        - ApiGatewayLoggingIsEnabled
-        - - LoggingLevel: !If [IsProduction, 'ERROR', 'INFO']
-            ResourcePath: '/*'
-            HttpMethod: '*'
-            DataTraceEnabled: !If [IsProduction, False, True]
-            MetricsEnabled: True
-        - !Ref 'AWS::NoValue'
-  
-  # Add CloudWatch Log Group for API Gateway Access Logs
-  ApiGatewayAccessLogGroup:
-    Type: AWS::Logs::LogGroup
-    Condition: ApiGatewayLoggingIsEnabled
-    DeletionPolicy: !If [IsProduction, Retain, Delete]
-    UpdateReplacePolicy: Retain
-    Properties:
-      LogGroupName: !Sub '/aws/apigateway/${Prefix}-${ProjectId}-${StageId}-WebApi-access-logs'
-      RetentionInDays: !If [ IsProduction, !Ref LogRetentionInDaysForPROD,  !Ref LogRetentionInDaysForDEVTEST]
-
-  # Add CloudWatch Log Group for API Gateway Execution Logs
-  ApiGatewayExecutionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Condition: ApiGatewayLoggingIsEnabled
-    DeletionPolicy: !If [IsProduction, Retain, Delete]
-    UpdateReplacePolicy: Retain
-    Properties:
-      LogGroupName: !Sub 'API-Gateway-Execution-Logs_${WebApi}/${ApiPathBase}' # AWS default
-      RetentionInDays: !If [ IsProduction, !Ref LogRetentionInDaysForPROD,  !Ref LogRetentionInDaysForDEVTEST]
-
-  # ---------------------------------------------------------------------------
-  # Lambda Function Resources
-
-  # -- Lambda Function --
-  AppFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub '${Prefix}-${ProjectId}-${StageId}-AppFunction'
-      Description: "Magical Predictions"
-      Role: !GetAtt LambdaExecutionRole.Arn
-      PropagateTags: True
-
-      VersionDescription: "Development Stages"
-      AutoPublishCodeSha256: "20250226T0936" # Hash This To Overcome AliasLive Update Errors - Undocumented AWS bug workaround
-      AutoPublishAlias: live
-      DeploymentPreference:
-        Enabled: !If [ IsProduction, True,  False] # Gradual deployment only if in production so DEV and TEST aren't hindered
-        Type: !If [ IsProduction, !Ref FunctionGradualDeploymentType, "AllAtOnce"]
-        Role: !Ref DeployRole
-        Alarms:
-          Fn::If:
-            - CreateAlarms
-            - - !Ref AppFunctionErrorsAlarm
-            - - !Ref 'AWS::NoValue'
-
-      CodeUri: src/
-      Handler: index.handler
-      Runtime: python3.14 # https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
-      Architectures:
-        - !Ref FunctionArchitecture # arm64 has better processing than default x86_64 - but layers and binaries must support
-      Timeout: !Ref FunctionTimeOutInSeconds
-      MemorySize: !Ref FunctionMaxMemoryInMB
-
-      Environment:
-        Variables:
-          DEPLOY_ENVIRONMENT: !Ref DeployEnvironment # PROD, TEST, DEV - a different category of environment
-          LOG_LEVEL: !If [ IsProduction, "INFO",  "DEBUG"] # 20 for prod, 10 for non-prod (used by logging library)
-          PARAM_STORE_PATH: !Ref ParameterStoreHierarchy # Path to instance specific params /Finance/ops/PROD/acme-myapp-prod/
-          LAMBDA_TIMEOUT_IN_SEC: !Ref FunctionTimeOutInSeconds # so we can calculate any external connection timeout in our code
-
-      Events:
-        GetEvent:
-          Type: Api
-          Properties:
-            Path: /
-            Method: get
-            RestApiId: !Ref WebApi
-
-  # -- LambdaFunction Execution Role --
-  LambdaExecutionRole:
+  SchedContainerExecRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${Prefix}-${ProjectId}-${StageId}-LambdaExecRole"
-      Description: "IAM Role that allows the Lambda permission to execute and access resources"
+      RoleName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedContainerExecRole'
       Path: !Ref RolePath
-      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue' ]
+      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
       AssumeRolePolicyDocument:
+        Version: '2012-10-17'
         Statement:
-        - Effect: Allow
-          Principal:
-            Service: [lambda.amazonaws.com]
-          Action: sts:AssumeRole
-
-      # These are the resources your Lambda function needs access to Logs, SSM Parameters, DynamoDb, S3, etc.
-      # Define specific actions such as get/put (read/write). Work towards practicing the Principle of Least Privilege
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
       Policies:
-      - PolicyName: !Sub "${Prefix}-${ProjectId}-${StageId}-ExecutionPolicy"
-        PolicyDocument:
-          Statement:
+        - PolicyName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedContainerExecPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: SSMParameterAccess
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParametersByPath
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*'
+              - Sid: S3StaticHostAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3StaticHostBucket}/${Prefix}-${ProjectId}-${StageId}/*'
+              - Sid: CloudWatchLogsAccess
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-SchedContainer:*'
 
-          - Sid: LambdaAccessToWriteLogs
-            Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-            Effect: Allow
-            Resource: !GetAtt AppLogGroup.Arn
+  # -- Scheduled CodeBuild Project --
 
-  # -- Lambda permissions allowing API Gateway to Execute it --
-  #    For gradual deployments to work properly, API Gateway needs permission to invoke both:
-  #    1. $LATEST version (new code during deployment)
-  #    2. :live alias (stable version during traffic shifting)
-  #    Without both permissions, gradual deployments (in production) will fail with permission errors
-
-  # Permission for API Gateway to invoke the $LATEST version of the Lambda function
-  # This is used in all environments and during gradual deployments for new code
-  ConfigLambdaPermission:
-    Type: "AWS::Lambda::Permission"
+  SchedContainer:
+    Type: AWS::CodeBuild::Project
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Sub "${AppFunction}"  # References $LATEST by default
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebApi}/*"
+      Name: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedContainer'
+      Description: !Sub 'Scheduled CodeBuild container for ${Prefix}-${ProjectId}-${StageId}'
+      ServiceRole: !GetAtt SchedContainerExecRole.Arn
+      TimeoutInMinutes: !Ref CodeBuildTimeoutInMinutes
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: !Sub 'arn:aws:s3:::${S3StaticHostBucket}/${Prefix}-${ProjectId}-${StageId}/commands.yml'
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: !If [EnablePrivilegedMode, true, false]
+        EnvironmentVariables:
+          - Name: PREFIX
+            Value: !Ref Prefix
+          - Name: PROJECT_ID
+            Value: !Ref ProjectId
+          - Name: STAGE_ID
+            Value: !Ref StageId
+          - Name: PARAM_STORE_HIERARCHY
+            Value: !Sub '${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/'
+          - Name: DEPLOY_ENVIRONMENT
+            Value: !Ref DeployEnvironment
+          - Name: S3_MOUNT_POINT
+            Value: !Ref S3MountPoint
+          - Name: S3_BUCKET_NAME
+            Value: !Ref S3MountBucketName
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub '/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-SchedContainer'
+          Status: ENABLED
 
-  # Permission for API Gateway to invoke the :live alias of the Lambda function
-  # Only created in production where gradual deployments are enabled
-  # During gradual deployment, traffic shifts from :live alias to $LATEST version
-  ConfigLambdaPermissionLive:
-    Type: "AWS::Lambda::Permission"
-    Condition: IsProduction  # Only needed in production for gradual deployments
+  # -- EventBridge Scheduler Role --
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: HasScheduleExpression
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref AppFunction.Alias # live
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebApi}/*"
+      RoleName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedulerRole'
+      Path: !Ref RolePath
+      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedulerPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: StartCodeBuild
+                Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                Resource:
+                  - !GetAtt SchedContainer.Arn
 
-  # -- Lambda Function Error Alarm --
+  # -- EventBridge Schedule --
 
-  AppFunctionErrorsAlarm:
-    Type: "AWS::CloudWatch::Alarm"
-    Condition: CreateAlarms # Either PROD or ALWAYS - Check Conditions
+  Schedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: HasScheduleExpression
     Properties:
-      AlarmDescription: Lambda Function Error > 1
-      MetricName: Errors
-      Statistic: Sum
-      ComparisonOperator: GreaterThanThreshold
-      Threshold: 1
-      Period: 900
-      EvaluationPeriods: 1
-      TreatMissingData: notBreaching
-      Namespace: AWS/Lambda
-      Dimensions:
-        - Name: FunctionName
-          Value: !Ref AppFunction
-      AlarmActions:
-        - Ref: AppFunctionErrorAlarmNotification
+      Name: !Sub '${Prefix}-${ProjectId}-${StageId}-Schedule'
+      ScheduleExpression: !If [IsProduction, !Ref ScheduleExpressionPROD, !Ref ScheduleExpressionDEVTEST]
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      Target:
+        Arn: !GetAtt SchedContainer.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: '{}'
 
-  # -- Lambda Function Notification for Error Alarm --
+  # -- CodeBuild Log Group --
 
-  AppFunctionErrorAlarmNotification:
-      Type: AWS::SNS::Topic
-      Condition: CreateAlarms
-      Properties: 
-        DisplayName: !Sub 'AWS-Alarm-${Prefix}-${ProjectId}-${StageId}'
-        FifoTopic: false
-        Subscription:
-          - Endpoint: !Ref AlarmNotificationEmail
-            Protocol: 'email'
-
-  # -- Lambda Log Group with a retention policy --
-  AppLogGroup:
+  SchedContainerLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
-    Properties: 
-        LogGroupName: !Sub '/aws/lambda/${Prefix}-${ProjectId}-${StageId}-AppFunction' # Avoid circular reference !Sub "/aws/lambda/${AppFunction}"
-        RetentionInDays: !If [ IsProduction, !Ref LogRetentionInDaysForPROD,  !Ref LogRetentionInDaysForDEVTEST]
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-SchedContainer'
+      RetentionInDays: !If [IsProduction, !Ref LogRetentionInDaysForPROD, !Ref LogRetentionInDaysForDEVTEST]
+
+  # -- CodeBuild Error Alarm (PROD only) --
+
+  SchedContainerAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateAlarms
+    Properties:
+      AlarmDescription: !Sub 'CodeBuild FailedBuilds alarm for ${Prefix}-${ProjectId}-${StageId}-SchedContainer'
+      MetricName: FailedBuilds
+      Statistic: Sum
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 0
+      Period: 300
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching
+      Namespace: AWS/CodeBuild
+      Dimensions:
+        - Name: ProjectName
+          Value: !Ref SchedContainer
+      AlarmActions:
+        - !Ref AlarmNotification
+
+  # -- Alarm SNS Topic (PROD only) --
+
+  AlarmNotification:
+    Type: AWS::SNS::Topic
+    Condition: CreateAlarms
+    Properties:
+      DisplayName: !Sub 'AWS-Alarm-${Prefix}-${ProjectId}-${StageId}'
+      FifoTopic: false
+      Subscription:
+        - Endpoint: !Ref AlarmNotificationEmail
+          Protocol: email
 
 # =============================================================================
 # OUTPUTS
@@ -471,30 +439,9 @@ Resources:
 
 Outputs:
 
-  # -- Endpoint examples
-  ApiEndpoint:
-    Description: "Endpoint URL"
-    Value: !Sub "https://${WebApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiPathBase}/" # change to your endpoint
-
-  # -- CloudWatch Log Groups
-  CloudWatchLambdaExecutionLogGroup:
-    Description: "Cloud Watch Log Group for Lambda Execution Logs"
-    Value: !Sub "https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#logStream:group=%2Faws%2Flambda%2F${AppFunction}"
-
-  CloudWatchApiGatewayExecutionLogGroup:
-    Condition: ApiGatewayLoggingIsEnabled
-    Description: "Cloud Watch Log Group for API Gateway Execution Logs"
-    Value: !Sub "https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#logStream:group=%2Faws%2Fapigateway%2FAPI-Gateway-Execution-Logs_${WebApi}/${ApiPathBase}"
-
-  CloudWatchApiGatewayAccessLogGroup:
-    Condition: ApiGatewayLoggingIsEnabled
-    Description: "Cloud Watch Log Group for API Gateway Access Logs"
-    Value: !Sub "https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#logStream:group=%2Faws%2Fapigateway%2F${Prefix}-${ProjectId}-${StageId}-WebApi-access-logs"
-
-  # -- Resource quick links
-  LambdaWebConsole:
-    Description: "Lambda Web Console"
-    Value: !Sub "https://console.aws.amazon.com/lambda/home?region=${AWS::Region}#/functions/${AppFunction}?tab=code"
+  CloudWatchSchedContainerLogGroup:
+    Description: "CloudWatch Log Group for Scheduled CodeBuild"
+    Value: !Sub "https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#logStream:group=%2Faws%2Fcodebuild%2F${Prefix}-${ProjectId}-${StageId}-SchedContainer"
 
   ParameterStore:
     Description: "SSM Parameter Store"

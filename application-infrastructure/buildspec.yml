@@ -61,6 +61,10 @@ phases:
       # Use CloudFormation to package the application infrastructure and code that was placed in the S3 Artifacts Bucket (usually something like `cf-artifacts-<region>-<account-id>` or `cf-templates-randomchars-<region>`).
       - aws cloudformation package --template template.yml --s3-bucket $S3_ARTIFACTS_BUCKET --output-template template-export.yml
 
+      # Copy commands.yml and scripts to S3 Static Host Bucket
+      - aws s3 cp src/commands.yml s3://$S3_STATIC_HOST_BUCKET/$PREFIX-$PROJECT_ID-$STAGE_ID/commands.yml
+      - aws s3 cp src/scripts/ s3://$S3_STATIC_HOST_BUCKET/$PREFIX-$PROJECT_ID-$STAGE_ID/scripts/ --recursive
+
       # list files in the artifacts
       - ls -l -a
 

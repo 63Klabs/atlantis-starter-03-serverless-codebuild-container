@@ -10,6 +10,14 @@ This application is **Ready-to-Deploy-and-Run** with the [63Klabs Atlantis Templ
 
 Follow your organization's guidelines for repository and pipeline management.
 
+## Prerequisites
+
+Before deploying this application, ensure the following are in place:
+
+- The pipeline's CloudFormation service role must include a CodeBuild managed policy. Add it via the `CloudFormationSvcRoleIncludeManagedPolicyArns` pipeline parameter — this allows the CloudFormation service role to create and manage CodeBuild, EventBridge Scheduler, and related resources in the application stack.
+- The S3 DevOps bucket (`template-storage-s3-devops.yml`) must be deployed with `BuildSourceArn` set to the pipeline's CodeBuild project ARN — this grants the pipeline's CodeBuild project permission to copy `commands.yml` and `scripts/` to the S3 Static Host Bucket.
+- The `S3StaticHostBucket` parameter must be passed to the pipeline — this is the S3 bucket name where `commands.yml` and `scripts/` are stored for the Scheduled CodeBuild.
+
 ## Why Use Atlantis?
 
 Like any other project, you can skip the Atlantis platform and go at it on your own using `sam deploy` from the CLI within the application-infrastructure directory.

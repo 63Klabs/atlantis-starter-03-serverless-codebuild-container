@@ -10,19 +10,23 @@ An example to demonstrate Atlantis provisioning a container service utilizing a 
 
 > **Ready-to-Deploy-and-Run** with the [63Klabs Atlantis Templates and Scripts Platform for Serverless Deployments on AWS](https://github.com/63Klabs/atlantis)
 
-## Why Use Over a Self-Managed Container?
+## Why Use Over a Self-Managed Container or Lambda?
 
-First, you may not need a container when the AWS managed Linux environment provided by CodeBuild will do.
+Lambda only provides a single runtime, and any "off the shelf" scripts require modification to run inside a function.
 
-If you just need to run scripts on a periodic basis, and you don't need persistence between runs, CodeBuild provides a lightweight option on an environment managed by AWS. However, you should use your own self-managed container when you need to install applications or require installs, data, and advanced configurations to persist between runs.
+Containers require additional management, upgrades, installs.
 
-With the ability to mount S3 as an NFS you can extend persistence within CodeBuild.
+CodeBuild provides a managed service, a clean slate, ability to run a variety of scripts and commands.
 
-## Why Use Over Lambda?
+Data and file persistence can be maintained by:
+- Cloning a repo (read only)
+- S3 sync or copy
+- S3 File System mount
+- CLI or API calls
 
-Scheduled Lambda functions serve their purpose, but if you are running a combination of shell, Python, and/or Node.js scripts, or you just need to run scripts "off the shelf" without modifying to run inside Lambda, CodeBuild is a good option.
+If system persistence is not required, then CodeBuild is a good, lightweight, low-maintenance option and this application is meant to fill that need.
 
-What about Lambda containers? We'll return to the fact that you may not need a container when the AWS managed Linux environment provided by CodeBuild will do.
+> **NOTE:** If you require system persistence with installed applications and configurations then you may be better off managing a container. 
 
 ## Tutorial
 

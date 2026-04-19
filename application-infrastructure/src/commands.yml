@@ -48,12 +48,15 @@ phases:
 
       # Gather data from other sources such as SSM Parameters, S3, APIs
 
+      # Example: Read an SSM Parameter
+      - aws ssm get-parameter --name "${PARAM_STORE_HIERARCHY}ExampleParameter" --query "Parameter.Value" --output text
+
   build:
     commands:
 
       # Run your scripts here
       - python3 scripts/hello.py
-      
+
       # list files
       - ls -l -a
 
