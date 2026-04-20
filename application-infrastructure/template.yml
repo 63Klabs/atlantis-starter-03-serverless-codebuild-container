@@ -155,11 +155,7 @@ Parameters:
   DeployRole:
     Type: String
     Description: "Unused. Required by pipeline template ParameterOverrides."
-    Metadata:
-      cfn-lint:
-        config:
-          ignore_checks:
-            - W2001
+    Default: "none"
 
   # ---------------------------------------------------------------------------
   # External Resources and Alarm Notifications
@@ -243,10 +239,15 @@ Conditions:
   # UseS3BucketNameOrgPrefix: !Not [!Equals [!Ref S3BucketNameOrgPrefix, ""]]
   HasPermissionsBoundaryArn: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
   CreateAlarms: !Equals [!Ref DeployEnvironment, "PROD"]
-  HasScheduleExpression: !Not
-    - !Equals
-      - !If [IsProduction, !Ref ScheduleExpressionPROD, !Ref ScheduleExpressionDEVTEST]
-      - ""
+  HasScheduleExpressionPROD: !And
+    - !Condition IsProduction
+    - !Not [!Equals [!Ref ScheduleExpressionPROD, ""]]
+  HasScheduleExpressionDEVTEST: !And
+    - !Not [!Condition IsProduction]
+    - !Not [!Equals [!Ref ScheduleExpressionDEVTEST, ""]]
+  HasScheduleExpression: !Or
+    - !Condition HasScheduleExpressionPROD
+    - !Condition HasScheduleExpressionDEVTEST
   EnablePrivilegedMode: !Or
     - !Equals [!Ref PrivilegedMode, "true"]
     - !And
@@ -318,7 +319,7 @@ Resources:
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
-        ComputeType: BUILD_GENERAL1_SMALL
+        ComputeType: BUILD_GENERAL1_SMALL # Change if you want a larger ComputeType
         Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
         Type: LINUX_CONTAINER
         PrivilegedMode: !If [EnablePrivilegedMode, true, false]
@@ -330,7 +331,7 @@ Resources:
           - Name: STAGE_ID
             Value: !Ref StageId
           - Name: PARAM_STORE_HIERARCHY
-            Value: !Sub '${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/'
+            Value: !Ref ParameterStoreHierarchy
           - Name: DEPLOY_ENVIRONMENT
             Value: !Ref DeployEnvironment
           - Name: S3_MOUNT_POINT

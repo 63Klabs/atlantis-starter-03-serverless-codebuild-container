@@ -2,6 +2,39 @@
 
 Operational guidance for administrators managing the Scheduled CodeBuild environment and pipeline.
 
+## Deploying the CodeBuild CRUD Managed Policy
+
+The application stack requires the CloudFormation service role to have permissions for creating CodeBuild projects and `/aws/codebuild/` log groups. A managed policy template is provided at `docs/admin-ops/template-policy-crud-codebuild.yml`.
+
+This policy uses ABAC (`${aws:PrincipalTag/atlantis:Application}`) so it only needs to be deployed once per account. Every pipeline whose CloudFormation service role carries the `atlantis:Application` tag will be scoped to manage only its own CodeBuild resources.
+
+### Deploy
+
+```bash
+aws cloudformation deploy \
+  --template-file docs/admin-ops/template-policy-crud-codebuild.yml \
+  --stack-name atlantis-policy-cfn-codebuild-crud \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    PolicyName=atlantis-CfnSvcRole-CodeBuildCRUD \
+    RolePath=/
+```
+
+### Attach to Pipeline
+
+After deployment, retrieve the policy ARN from the stack output:
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name atlantis-policy-cfn-codebuild-crud \
+  --query "Stacks[0].Outputs[?OutputKey=='PolicyArn'].OutputValue" \
+  --output text
+```
+
+Then pass the ARN to your pipeline's `CloudFormationSvcRoleIncludeManagedPolicyArns` parameter when configuring or updating the pipeline.
+
+---
+
 ## Scheduled CodeBuild Compute Type and Image
 
 The Scheduled CodeBuild (`SchedContainer`) defaults to:

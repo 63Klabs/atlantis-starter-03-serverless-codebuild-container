@@ -4,6 +4,57 @@ This guide covers common tasks for extending the Scheduled CodeBuild environment
 
 The Scheduled CodeBuild runs `commands.yml` (and scripts in `src/scripts/`) on a recurring schedule via EventBridge Scheduler. Commands execute in an Amazon Linux CodeBuild container with Python, Node.js, and the AWS CLI pre-installed.
 
+## Manually Starting the Scheduled CodeBuild
+
+In DEV/TEST environments the EventBridge schedule is often left empty, meaning the Scheduled CodeBuild won't run on its own. You can trigger it manually using the AWS CLI or the AWS Console.
+
+### AWS CLI
+
+```bash
+aws codebuild start-build \
+  --project-name <Prefix>-<ProjectId>-<StageId>-SchedContainer
+```
+
+For example, if your Prefix is `acme`, ProjectId is `cron-job`, and StageId is `test`:
+
+```bash
+aws codebuild start-build \
+  --project-name acme-cron-job-test-SchedContainer
+```
+
+You can optionally override environment variables for a single run:
+
+```bash
+aws codebuild start-build \
+  --project-name acme-cron-job-test-SchedContainer \
+  --environment-variables-override "name=MY_VAR,value=my-value,type=PLAINTEXT"
+```
+
+To watch the build progress:
+
+```bash
+# Get the build ID from the start-build output, then:
+aws codebuild batch-get-builds \
+  --ids <build-id> \
+  --query "builds[0].buildStatus" \
+  --output text
+```
+
+### AWS Console
+
+1. Open the [CodeBuild console](https://console.aws.amazon.com/codesuite/codebuild/projects)
+2. Find the project named `<Prefix>-<ProjectId>-<StageId>-SchedContainer`
+3. Click **Start build** (or **Start build with overrides** to customize environment variables)
+4. Monitor progress in the **Build history** tab
+
+### When to Use
+
+- Testing changes to `commands.yml` or scripts after a pipeline deployment to a TEST stage
+- Debugging build failures without waiting for a schedule
+- One-off executions in environments where no schedule is configured
+
+> **Note:** The CodeBuild project must already be deployed by the pipeline before you can start a manual build. Make sure your latest code has been merged and deployed to the target stage first.
+
 ## Mounting S3 as a File System
 
 You can mount an S3 bucket as a local file system using `mount-s3`. This is useful when your scripts need to read or write files on S3 as if they were local.

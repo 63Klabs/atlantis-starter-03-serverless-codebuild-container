@@ -26,6 +26,8 @@ phases:
       - mkdir -p /root/.cache/pip
       - pip config set global.cache-dir /root/.cache/pip
 
+      - cd application-infrastructure
+
       # Build Environment: Install Python dependencies for Build Scripts if build-scripts/requirements.txt exists
       - |
         if [ -f "build-scripts/requirements.txt" ]; then
@@ -37,14 +39,14 @@ phases:
 
   pre_build:
     commands:
-      
+
       # Application Environment: Install Python dependencies needed for application environment if requirements.txt exists
       - |
-        if [ -f "application-infrastructure/src/requirements.txt" ]; then
+        if [ -f "src/requirements.txt" ]; then
           echo "Installing Python dependencies for build scripts"
-          pip install -r application-infrastructure/src/requirements.txt
+          pip install -r src/requirements.txt
         else
-          echo "No application-infrastructure/src/requirements.txt found, skipping pip install"
+          echo "No src/requirements.txt found, skipping pip install"
         fi
             
       # Create a parameter in SSM Parameter store if it does not yet exist:
@@ -53,7 +55,6 @@ phases:
   build:
     commands:
 
-      - cd application-infrastructure
 
       # Replace placeholders in the template-configuration.json file
       - python3 ./build-scripts/update_template_configuration.py template-configuration.json

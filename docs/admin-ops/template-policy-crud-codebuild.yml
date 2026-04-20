@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Account-wide Managed Policy for CloudFormation Service Role - CodeBuild and Logs CRUD scoped by ABAC tags"
+
+# Atlantis for AWS SAM Deployments
+# Policy Template: CodeBuild CRUD for CloudFormation Service Role (Account-Wide ABAC)
+# Author: Generated for atlantis-starter-03-serverless-codebuild-container
+# Version: v0.0.1/2026-04-19
+
+# This template creates a single account-wide managed policy that grants any
+# pipeline's CloudFormation service role permission to create and manage CodeBuild
+# projects and associated CloudWatch Log Groups — scoped via ABAC.
+#
+# ABAC (Attribute-Based Access Control) ensures each CloudFormation service role
+# can only manage resources tagged with the same atlantis:ApplicationDeploymentId value as
+# the role itself. This allows a single policy to scale across all projects
+# without modification.
+#
+# The pipeline's CloudFormation service role is tagged:
+#   atlantis:ApplicationDeploymentId = Prefix-ProjectId-StageId
+#
+# Resources created by CloudFormation must carry the same tag. The policy uses:
+#   ${aws:PrincipalTag/atlantis:ApplicationDeploymentId}
+# to dynamically match the calling role's tag against resource tags.
+#
+# Attach the output policy ARN to pipelines via:
+#   CloudFormationSvcRoleIncludeManagedPolicyArns
+#
+# Deploy once per account (or once per region if needed).
+
+# =============================================================================
+# META DATA
+# -----------------------------------------------------------------------------
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Policy Naming"
+        Parameters:
+          - PolicyName
+          - RolePath
+
+# =============================================================================
+# PARAMETERS
+# -----------------------------------------------------------------------------
+
+Parameters:
+
+  PolicyName:
+    Type: String
+    Description: "Name for the managed policy. Should be unique within the account."
+    Default: "atlantis-CfnSvcRole-CodeBuildCRUD"
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9_\\-]{0,126}[a-zA-Z0-9]$"
+    MinLength: 2
+    MaxLength: 128
+    ConstraintDescription: "Alphanumeric, dashes, and underscores. 2-128 characters."
+
+  RolePath:
+    Type: String
+    Description: "Path for the managed policy. Must match the RolePath used in pipelines."
+    Default: "/"
+    AllowedPattern: "^\\/([a-zA-Z0-9-_]+[\\/])+$|^\\/$"
+    ConstraintDescription: "Must begin and end with a slash."
+
+# =============================================================================
+# RESOURCES
+# -----------------------------------------------------------------------------
+
+Resources:
+
+  # -- Managed Policy: CodeBuild and Logs CRUD (Account-Wide, ABAC-Scoped) --
+
+  CloudFormationCodeBuildPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Ref PolicyName
+      Description: "Allows CloudFormation service roles to manage CodeBuild projects and /aws/codebuild/ log groups scoped by atlantis:ApplicationDeploymentId tag (ABAC)"
+      Path: !Ref RolePath
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+
+          # ------------------------------------------------------------------
+          # CodeBuild Project - Create
+          # Uses aws:RequestTag to validate tags on the resource being created
+          # (chicken-and-egg: resource doesn't have tags until created)
+          # ------------------------------------------------------------------
+
+          - Sid: CodeBuildCreateWithTagMatch
+            Effect: Allow
+            Action:
+              - codebuild:CreateProject
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+
+          # ------------------------------------------------------------------
+          # CodeBuild Project - Update, Delete, Read
+          # Uses aws:ResourceTag to validate tags on the existing resource
+          # ------------------------------------------------------------------
+
+          - Sid: CodeBuildManageWithTagMatch
+            Effect: Allow
+            Action:
+              - codebuild:UpdateProject
+              - codebuild:DeleteProject
+              - codebuild:BatchGetProjects
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+
+          # ------------------------------------------------------------------
+          # CodeBuild Tagging
+          # Allow tag/untag only when the atlantis:ApplicationDeploymentId tag matches
+          # ------------------------------------------------------------------
+
+          - Sid: CodeBuildTagOperations
+            Effect: Allow
+            Action:
+              - codebuild:TagResource
+              - codebuild:UntagResource
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+
+          # ------------------------------------------------------------------
+          # CloudWatch Logs CRUD for /aws/codebuild/* log groups
+          # Log groups do not support tag-based authorization on all actions,
+          # so we scope by resource name pattern. The log group name follows:
+          #   /aws/codebuild/Prefix-ProjectId-StageId-SchedContainer
+          # which is deterministic from the CodeBuild project name.
+          #
+          # Since we cannot use ABAC on log group creation, we use a wildcard
+          # on /aws/codebuild/* and rely on the fact that only the CloudFormation
+          # service role (which is already scoped) calls these actions.
+          # ------------------------------------------------------------------
+
+          - Sid: LogGroupCRUDForCodeBuild
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:DeleteLogGroup
+              - logs:PutRetentionPolicy
+              - logs:DeleteRetentionPolicy
+              - logs:TagLogGroup
+              - logs:UntagLogGroup
+              - logs:TagResource
+              - logs:UntagResource
+              - logs:ListTagsForResource
+              - logs:DescribeLogGroups
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+
+          # ------------------------------------------------------------------
+          # Deny tag tampering
+          # Prevent changing or removing the atlantis:ApplicationDeploymentId tag to a
+          # value that differs from the principal's own tag. This closes the
+          # loophole where a role could re-tag a resource to escape ABAC scope.
+          # ------------------------------------------------------------------
+
+          - Sid: DenyCodeBuildTagTampering
+            Effect: Deny
+            Action:
+              - codebuild:TagResource
+              - codebuild:UntagResource
+              - codebuild:CreateProject
+              - codebuild:UpdateProject
+            Resource: "*"
+            Condition:
+              StringNotEquals:
+                "aws:RequestTag/atlantis:ApplicationDeploymentId": "${aws:PrincipalTag/atlantis:ApplicationDeploymentId}"
+              "Null":
+                "aws:RequestTag/atlantis:ApplicationDeploymentId": "false"
+
+# =============================================================================
+# OUTPUTS
+# -----------------------------------------------------------------------------
+
+Outputs:
+
+  PolicyArn:
+    Description: "Managed Policy ARN — attach to pipelines via CloudFormationSvcRoleIncludeManagedPolicyArns"
+    Value: !Ref CloudFormationCodeBuildPolicy
+    Export:
+      Name: !Ref PolicyName
