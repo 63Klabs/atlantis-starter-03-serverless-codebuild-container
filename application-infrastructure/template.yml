@@ -262,48 +262,6 @@ Conditions:
 
 Resources:
 
-  # -- CodeBuild Execution Role --
-
-  SchedContainerExecRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedContainerExecRole'
-      Path: !Ref RolePath
-      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: codebuild.amazonaws.com
-            Action: 'sts:AssumeRole'
-      Policies:
-        - PolicyName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedContainerExecPolicy'
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: SSMParameterAccess
-                Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                  - ssm:GetParametersByPath
-                Resource:
-                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}${DeployEnvironment}/${Prefix}-${ProjectId}-${StageId}/*'
-              - Sid: S3StaticHostAccess
-                Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource:
-                  - !Sub 'arn:aws:s3:::${S3StaticHostBucket}/${Prefix}-${ProjectId}-${StageId}/*'
-              - Sid: CloudWatchLogsAccess
-                Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource:
-                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-SchedContainer:*'
-
   # -- Scheduled CodeBuild Project --
 
   SchedContainer:
@@ -342,6 +300,48 @@ Resources:
         CloudWatchLogs:
           GroupName: !Sub '/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-SchedContainer'
           Status: ENABLED
+
+  # -- CodeBuild Execution Role --
+
+  SchedContainerExecRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedContainerExecRole'
+      Path: !Ref RolePath
+      PermissionsBoundary: !If [HasPermissionsBoundaryArn, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub '${Prefix}-${ProjectId}-${StageId}-SchedContainerExecPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: SSMParameterAccess
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParametersByPath
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}/*'
+              - Sid: S3StaticHostAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3StaticHostBucket}/${Prefix}-${ProjectId}-${StageId}/*'
+              - Sid: CloudWatchLogsAccess
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-SchedContainer:*'
 
   # -- EventBridge Scheduler Role --
 
