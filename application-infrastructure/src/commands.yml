@@ -38,18 +38,22 @@ phases:
       # Mount S3 as a File System
       
       - |
-        if [ "${S3_MOUNT_POINT}" != "" ] && [ "${S3_BUCKET_NAME}" != "" ]; then
-          echo "Mounting S3 bucket ${S3_BUCKET_NAME} to ${S3_MOUNT_POINT}"
+        if [ "${S3_MOUNT_POINT}" != "" ] && [ "${S3_MOUNT_BUCKET_NAME}" != "" ]; then
+          echo "Mounting S3 bucket ${S3_MOUNT_BUCKET_NAME} to ${S3_MOUNT_POINT}"
           mkdir -p ${S3_MOUNT_POINT}
-          sudo mount-s3 ${S3_BUCKET_NAME} ${S3_MOUNT_POINT}
+          sudo mount-s3 ${S3_MOUNT_BUCKET_NAME} ${S3_MOUNT_POINT}
         else
-          echo "S3_MOUNT_POINT or S3_BUCKET_NAME not set, skipping S3 mount"
+          echo "S3_MOUNT_POINT or S3_MOUNT_BUCKET_NAME not set, skipping S3 mount"
         fi
 
       # Gather data from other sources such as SSM Parameters, S3, APIs
 
       # Example: Read an SSM Parameter
       - aws ssm get-parameter --name "${PARAM_STORE_HIERARCHY}ExampleParameter" --query "Parameter.Value" --output text
+      
+      # Copy from S3
+      - aws s3 cp s3://$S3_STATIC_HOST_BUCKET/$PREFIX-$PROJECT_ID-$STAGE_ID/scripts/ scripts/ --recursive
+      - chmod +x scripts/*
 
   build:
     commands:

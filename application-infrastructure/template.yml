@@ -294,8 +294,10 @@ Resources:
             Value: !Ref DeployEnvironment
           - Name: S3_MOUNT_POINT
             Value: !Ref S3MountPoint
-          - Name: S3_BUCKET_NAME
+          - Name: S3_MOUNT_BUCKET_NAME
             Value: !Ref S3MountBucketName
+          - Name: S3_STATIC_HOST_BUCKET
+            Value: !Ref S3StaticHostBucket
       LogsConfig:
         CloudWatchLogs:
           GroupName: !Sub '/aws/codebuild/${Prefix}-${ProjectId}-${StageId}-SchedContainer'
@@ -336,6 +338,17 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !Sub 'arn:aws:s3:::${S3StaticHostBucket}/${Prefix}-${ProjectId}-${StageId}/*'
+
+              - Sid: S3StaticHostListAccess
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3StaticHostBucket}'
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - !Sub '${Prefix}-${ProjectId}-${StageId}/*'
                   
               - Sid: CloudWatchLogsAccess
                 Effect: Allow
