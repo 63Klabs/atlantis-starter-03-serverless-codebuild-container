@@ -321,19 +321,22 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+
               - Sid: SSMParameterAccess
                 Effect: Allow
                 Action:
                   - ssm:GetParameter
                   - ssm:GetParametersByPath
                 Resource:
-                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}/*'
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterStoreHierarchy}*'
+
               - Sid: S3StaticHostAccess
                 Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
                   - !Sub 'arn:aws:s3:::${S3StaticHostBucket}/${Prefix}-${ProjectId}-${StageId}/*'
+                  
               - Sid: CloudWatchLogsAccess
                 Effect: Allow
                 Action:
