@@ -32,13 +32,23 @@ Using the Atlantis SAM Config scripts in your organization's central infrastruct
 
 ```bash
 ./cli/create_repo.py YOUR_REPO_NAME
-# Choose 01-basic-apigw-lambda-py.zip
+# Choose 03-serverless-codebuild-container.zip
 
 # Create a pipeline for the test branch
 ./cli/config.py pipeline PREFIX YOUR_PROJECT_ID test
 
 # Deploy the pipeline
 ./cli/deploy.py pipeline PREFIX YOUR_PROJECT_ID test
+```
+
+Next, you will need an S3 bucket to save your configuration file.
+
+```bash
+./cli/config.py storage PREFIX YOUR_PROJECT_ID
+# Choose template-storage-s3-devops.yml
+# For BuildSourceArn use the CodeBuild project ARN from the pipeline output
+
+./cli/deploy.py storage PREFIX YOUR_PROJECT_ID
 ```
 
 Clone the repository to your local machine and perform your first merge:
