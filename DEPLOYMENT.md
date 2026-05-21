@@ -15,8 +15,8 @@ Follow your organization's guidelines for repository and pipeline management.
 Before deploying this application, ensure the following are in place:
 
 - The pipeline's CloudFormation service role must include a CodeBuild managed policy. Add it via the `CloudFormationSvcRoleIncludeManagedPolicyArns` pipeline parameter — this allows the CloudFormation service role to create and manage CodeBuild, EventBridge Scheduler, and related resources in the application stack.
-- The S3 DevOps bucket (`template-storage-s3-devops.yml`) must be deployed with `BuildSourceArn` set to the pipeline's CodeBuild project ARN — this grants the pipeline's CodeBuild project permission to copy `commands.yml` and `scripts/` to the S3 Static Host Bucket.
-- The `S3StaticHostBucket` parameter must be passed to the pipeline — this is the S3 bucket name where `commands.yml` and `scripts/` are stored for the Scheduled CodeBuild.
+- An S3 DevOps bucket (using `template-storage-s3-devops.yml`) must be deployed with the same `Prefix` and `ProjectId` to grant the pipeline's CodeBuild project permission to copy `commands.yml` and `scripts/` to the S3 Static Host Bucket.
+- The `S3StaticHostBucket` parameter of the DevOps bucket must be passed to the pipeline — this is the S3 bucket name where `commands.yml` and `scripts/` are stored for the Scheduled CodeBuild.
 
 ## Why Use Atlantis?
 
@@ -28,7 +28,18 @@ If this is your first time deploying to AWS, or deployments have been difficult 
 
 ## Create Repository and Initialize with this Code
 
-Using the Atlantis SAM Config scripts in your organization's central infrastructure repository:
+Using the Atlantis SAM Config scripts in your organization's central infrastructure repository, deploy the S3 bucket and pipeline. They must use the same `Prefix` and `ProjectId`.
+
+First, deploy the S3 DevOps Bucket to save your scheduled buildspec file and scripts:
+
+```bash
+./cli/config.py storage PREFIX YOUR_PROJECT_ID
+# Choose template-storage-s3-devops.yml
+
+./cli/deploy.py storage PREFIX YOUR_PROJECT_ID
+```
+
+Next, create the pipeline:
 
 ```bash
 ./cli/create_repo.py YOUR_REPO_NAME
@@ -41,17 +52,7 @@ Using the Atlantis SAM Config scripts in your organization's central infrastruct
 ./cli/deploy.py pipeline PREFIX YOUR_PROJECT_ID test
 ```
 
-Next, you will need an S3 bucket to save your configuration file.
-
-```bash
-./cli/config.py storage PREFIX YOUR_PROJECT_ID
-# Choose template-storage-s3-devops.yml
-# For BuildSourceArn use the CodeBuild project ARN from the pipeline output
-
-./cli/deploy.py storage PREFIX YOUR_PROJECT_ID
-```
-
-Clone the repository to your local machine and perform your first merge:
+Clone the scheduled application repository to your local machine and perform your first merge:
 
 ```bash
 git clone HTTPS_CLONE_URL
