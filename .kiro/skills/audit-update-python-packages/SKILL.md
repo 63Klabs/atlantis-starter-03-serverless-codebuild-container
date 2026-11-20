@@ -1,7 +1,13 @@
 ---
-inclusion: manual
-description: "Scans all requirements*.txt files in the repository (requirements.txt, requirements-dev.txt, requirements-test.txt), audits packages for known vulnerabilities using pip-audit, and updates packages to remediate them. Production dependencies (requirements.txt) are prioritized. Respects existing version pinning strategies (exact pins, compatible release, ranges). Reports what was changed and why."
+name: audit-update-python-packages
+description: Scans all requirements*.txt files in the repository (requirements.txt, requirements-dev.txt, requirements-test.txt), audits packages for known vulnerabilities using pip-audit, and updates packages to remediate them. Production dependencies (requirements.txt) are prioritized. Respects existing version pinning strategies (exact pins, compatible release, ranges). Reports what was changed and why. Use when asked to audit, patch, or update Python or pip dependencies, fix pip-audit findings, remediate CVEs or security advisories in requirements files, or bring packages up to date.
+metadata:
+  sourceRepo: "https://github.com/63Klabs/atlantis-with-kiro-ai"
+  sourcePath: "examples/skills/audit-update-python-packages/SKILL.md"
+  lastModified: "2026-10-27"
 ---
+
+# Audit and update Python packages
 
 Audit and update Python packages across all requirements files in this repository to remediate vulnerabilities.
 
